@@ -1,63 +1,65 @@
- <?php
-include "../../controller/pedra/pedra_relatorio_controller.php";
+<?php
 
-require_once '../../phpexcel/PHPExcel.php';
+include "../../controller/pedra/pedra_relatorio_controller.php";
 
 $con = new Pedra_Relatorio_Controller();
 
 $dados = $con->getExportarPedra();
 
-$html = "<html><head></head><body>"
- ."<table border='1'>
-    <thead>
-      <tr>
-        <th> Corredor   </th>
-        <th> Origem     </th>
-        <th> Cliente    </th>
-        <th> ".date("d/m")." </th>
-        <th> ".date("d/m", strtotime("+1 Day"))." </th>
-        <th> ".date("d/m", strtotime("+2 Day"))." </th>
-        <th> ".date("d/m", strtotime("+3 Day"))." </th>
-      </tr>
-    </thead>
-    <tbody>";
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
+date_default_timezone_set('America/Sao_Paulo');
+if (PHP_SAPI == 'cli') die ('This example should only be run from a Web Browser');
 
-    foreach ($dados as $dado){
-      $html .= ""
-      ."<tr>"
-        ."<td>".$dado['idCorredor']."</td>"
-        ."<td>".$dado['sgTerminal']."</td>"
-        ."<td>".(mb_detect_encoding($dado['nmCliente'])== "UTF-8"? utf8_decode($dado['nmCliente']):$dado['nmCliente'])."</td>"
-       // ."<td>".$dado['nmCliente']."</td>"
-        ."<td>".$dado['re_d']."</td>"
-        ."<td>".$dado['re_dmai']."</td>"
-        ."<td>".$dado['re_dmaii']."</td>"
-        ."<td>".$dado['re_dmaiii']."</td>"
-      ."</tr>";
-    }
-    $html .= "</tbody></table></body></html> ";
+require_once '../../phpexcel/PHPExcel.php';
 
-$filename = "DownloadReport";
-$table    = $html;
+$table = array();
 
-// save $table inside temporary file that will be deleted later
-$tmpfile = tempnam(sys_get_temp_dir(), 'html');
-file_put_contents($tmpfile, $table);
+$head = array(
+   "Corredor",
+   "Origem",
+   "Cliente",
+   date("d/m"),
+   date("d/m",strtotime("+1 Day")),
+   date("d/m",strtotime("+2 Day")),
+   date("d/m", strtotime("+3 Day"))
+);
 
-// insert $table into $objPHPExcel's Active Sheet through $excelHTMLReader
-$objPHPExcel     = new PHPExcel();
+array_push($table, $head);
 
-$objPHPExcel->getActiveSheet()->setTitle('any name you want'); // Change sheet's title if you want
+foreach ($dados as $dado){
+   
+   $tr = array( 
+         $dado['idCorredor'],
+         $dado['sgTerminal'],
+         $dado['nmCliente'],
+         $dado['re_d'],
+         $dado['re_dmai'],
+         $dado['re_dmaii'],
+         $dado['re_dmaiii']
+      );
+   
+   array_push($table, $tr);        
 
-unlink($tmpfile); // delete temporary file because it isn't needed anymore
+}
 
-header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); // header for .xlxs file
-header('Content-Disposition: attachment;filename='.$filename); // specify the download file name
-header('Cache-Control: max-age=0');
+$objPHPExcel = new PHPExcel();
+$objWorksheet = $objPHPExcel->getActiveSheet();
+$objWorksheet->fromArray($table, null, 'A1', true );
 
-// Creates a writer to output the $objPHPExcel's content
-$writer = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
-$writer->save('php://output');
+$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel5');
+
+$cellIterator = $objWorksheet->getRowIterator()->current()->getCellIterator();
+$cellIterator->setIterateOnlyExistingCells( true );
+
+//AJUSTA O WITH DAS COLUNAS
+foreach( $cellIterator as $cell ) {
+        $objWorksheet->getColumnDimension( $cell->getColumn() )->setAutoSize( true );
+}
+
+$objWriter->save("Pedra.xls");
+header('Location: Pedra.xls');
+//unlink('sheet.xls');
+
 exit;
-
-//echo $html;
